@@ -13,6 +13,8 @@ export interface PluginSettings {
   fixPath: boolean;
   applyImage: boolean;
   deleteSource: boolean;
+  pasteMarkdownUpload: boolean;
+  autoRenameRule: string;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -23,6 +25,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   workOnNetWork: false,
   fixPath: false,
   applyImage: true,
+  pasteMarkdownUpload: false,
+  autoRenameRule: "{{date:YYYY}}/{{date:MM}}/{{date:DD}}/{{title}}",
   newWorkBlackDomains: "",
   deleteSource: false,
 };
@@ -173,5 +177,59 @@ export class SettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("🛠 粘贴Markdown文本自动上传")
+      .setDesc("Markdown文本中包含图片链接时，粘贴时自动上传图床")
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.pasteMarkdownUpload)
+          .onChange(async value => {
+            this.plugin.settings.pasteMarkdownUpload = value;
+            this.display();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("🛠 图片命名规则")
+      .setDesc(this.multiDesc(
+`上传到图床前，会根据预设的规则重新命名图片，此规则用来配置如何重命名图片名（包含路径）。
+
+可用的变量占位符：
+- {{title}}：当前文档的标题
+- {{timestamp}}：时间戳
+- {{uniqueid}}: 唯一流水号
+- {{date:$FORMAT}}：Moment.js 的日期 format 字符串，例：{{date:YYYYMMDD}}
+
+此规则可以定义对应层级的目录，例如“img/{{date:YYYY}}/{{date:MM}}/{{date:DD}}/{{title}}”规则就是每天生成一个目录，以文件名作为图片名的前缀，以图片在文档中的序号作为后缀来生成图片名，输出“img/2023/01/01/图片自动上传实现-01.png”
+`))
+      .addText(text =>
+        text
+          .setPlaceholder("")
+          .setValue(this.plugin.settings.autoRenameRule)
+          .onChange(async value => {
+            this.plugin.settings.autoRenameRule = value;
+            await this.plugin.saveSettings();
+          })
+      );
+  }
+
+  multiDesc(desc: string): DocumentFragment {
+    const frag = document.createDocumentFragment();
+    const arrDesc = desc.split("\n");
+    arrDesc.forEach(descItem => {
+      if (descItem) {
+        const div = document.createElement("div");
+        div.innerHTML = descItem;
+        frag.appendChild(div);
+      } else {
+        const br = document.createElement("br");
+        frag.appendChild(br);
+      }
+
+    });
+
+    return frag;
   }
 }

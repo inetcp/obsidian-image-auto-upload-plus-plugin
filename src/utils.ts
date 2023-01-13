@@ -3,13 +3,13 @@ import { Readable } from "stream";
 import { clipboard } from "electron";
 
 export function isAnImage(ext: string) {
-  return [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff"].includes(
+  return [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff", ".tif", ".ico", ".webp"].includes(
     ext.toLowerCase()
   );
 }
 export function isAssetTypeAnImage(path: string): Boolean {
   return (
-    [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff"].indexOf(
+    [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff", ".tif", ".ico", ".webp"].indexOf(
       extname(path).toLowerCase()
     ) !== -1
   );
@@ -83,4 +83,34 @@ export function arrayToObject<T extends AnyObj>(
     obj[element[key]] = element;
   });
   return obj;
+}
+
+export function escapeRegExp(s: string) {
+  return s.replaceAll(/[\\\\/:*?\"<>|]/g, "-");
+}
+
+export function prefixZero(n: number, m: number) {
+	return (Array(m).join("0") + n).slice(-m);
+}
+
+export function isEmpty(s: string) {
+  return s === undefined || s === null || s === "";
+}
+
+export function uniqueId(): string {
+  return Date.now().toString(36) + (Math.random() + 1).toString(36).substr(2, 5);
+}
+
+export function resolveRule(rule: string, title: string): string {
+  const mm = window.moment();
+
+  const resolvedText = rule
+    .replaceAll(/\{\{title\}\}/g, title)
+    .replaceAll(/\{\{timestamp\}\}/g, Date.now().toString())
+    .replaceAll(/\{\{uniqueid\}\}/g, uniqueId())
+    .replaceAll(/\{\{date:(.+?)\}\}/g, (match, $1) => {
+      return mm.format($1);
+    });
+
+  return resolvedText;
 }
