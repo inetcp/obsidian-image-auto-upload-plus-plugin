@@ -15,6 +15,7 @@ export interface PluginSettings {
   deleteSource: boolean;
   pasteMarkdownUpload: boolean;
   autoRenameRule: string;
+  simultaneousUploadNumber: number;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   autoRenameRule: "{{date:YYYY}}/{{date:MM}}/{{date:DD}}/{{title}}",
   newWorkBlackDomains: "",
   deleteSource: false,
+  simultaneousUploadNumber: 5
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -194,7 +196,7 @@ export class SettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("🛠 图片命名规则")
       .setDesc(this.multiDesc(
-`上传到图床前，会根据预设的规则重新命名图片，此规则用来配置如何重命名图片名（包含路径）。
+`用于下载图片或上传到图床前，生成图片的命名规则。会根据预设的规则重新命名图片（包含路径）。
 
 可用的变量占位符：
 - {{title}}：当前文档的标题
@@ -210,6 +212,19 @@ export class SettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.autoRenameRule)
           .onChange(async value => {
             this.plugin.settings.autoRenameRule = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+      new Setting(containerEl)
+      .setName("🛠 同时上传图片数量")
+      .setDesc("批量上传时，同时上传的最大数量，超过这个数量将拆分多个批次上传")
+      .addText(toggle =>
+        toggle
+          .setValue(this.plugin.settings.simultaneousUploadNumber.toString())
+          .onChange(async value => {
+            this.plugin.settings.simultaneousUploadNumber = value ? parseInt(value) : 0;
+            this.display();
             await this.plugin.saveSettings();
           })
       );

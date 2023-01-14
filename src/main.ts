@@ -133,7 +133,9 @@ export default class imageAutoUploadPlugin extends Plugin {
       const url = file.path;
       const asset = getUrlAsset(url);
       if (!isAnImage(asset.substr(asset.lastIndexOf(".")))) {
-        continue;
+        if (!(await this.isImageByImgLoad(url))) {
+          continue;
+        }
       }
       let [name, ext] = [
         decodeURI(parse(asset).name).replaceAll(/[\\\\/:*?\"<>|]/g, "-"),
@@ -610,6 +612,18 @@ export default class imageAutoUploadPlugin extends Plugin {
 
 /* ======================== 自定义部分 ======================== */
 
+  isImageByImgLoad(imgUrl: string) {
+    let img = document.createElement("img");
+    img.src = imgUrl;
+    return new Promise(function(resolve, reject) {
+      img.onerror = () => {
+        resolve(false);
+      };
+      img.onload = () => {
+        resolve(true);
+      };
+    });
+  }
 
   /**
    * 注册编辑器右键菜单，只有当前行包含图片链接，才显示“Upload”菜单
@@ -627,10 +641,14 @@ export default class imageAutoUploadPlugin extends Plugin {
             return false;
           }
 
-          const hasImage = imageList.some(image => {
+          const hasImage = imageList.some(async image => {
             if (image.path.startsWith("http")) {
               const asset = getUrlAsset(image.path);
-              return isAnImage(asset.substr(asset.lastIndexOf(".")));
+              const isImage = isAnImage(asset.substr(asset.lastIndexOf(".")));
+              if (!isImage) {
+                return await this.isImageByImgLoad(image.path);
+              }
+              return true;
             } else {
               return isAssetTypeAnImage(image.path);
             }
@@ -679,11 +697,14 @@ export default class imageAutoUploadPlugin extends Plugin {
         if (image.path.startsWith("http")) {
           const asset = getUrlAsset(image.path);
           if (!isAnImage(asset.substr(asset.lastIndexOf(".")))) {
-            continue;
+            if (!(await this.isImageByImgLoad(image.path))) {
+              continue;
+            }
           }
 
           const fileName = image.name || 'image';
-          const filePath = join(attachmentFolderPath, `${fileName}${parse(asset).ext}`);
+          const fileExt = parse(asset).ext || ".png";
+          const filePath = join(attachmentFolderPath, `${fileName}${fileExt}`);
           newImgInfo = await this.renameter.generateNewName(filePath, attachmentFolderPath);
           const response = await this.download(image.path, newImgInfo.imgPath);
           if (!response.ok) {
@@ -707,11 +728,27 @@ export default class imageAutoUploadPlugin extends Plugin {
     return newImageList;
   }
 
-  uploadFilesByImageList(imageList: Image[], content: string, callback: Function) {
-    this.uploader.uploadFiles(imageList.map(item => item.path)).then(res => {
+  async uploadFilesByImageList(imageList: Image[], content: string, callback: Function) {
+    if (imageList.length == 0) {
+      return;
+    }
+
+    const pageSize = this.settings.simultaneousUploadNumber;
+    const pageCount = Math.ceil(imageList.length / pageSize);
+    new Notice(`${imageList.length}张图片将分${pageCount}批进行上传...`);
+    for(let currentPage = 1; currentPage <= pageCount; currentPage++) {
+      const skipNum = (currentPage - 1) * pageSize;
+      const pagedImageList = (skipNum + pageSize >= imageList.length)
+        ? imageList.slice(skipNum, imageList.length)
+        : imageList.slice(skipNum, skipNum + pageSize);
+      const pageStart = skipNum + 1;
+      const pageEnd = skipNum + pagedImageList.length;
+
+      const res = await this.uploader.uploadFiles(pagedImageList.map(item => item.path));
+
       if (res.success) {
         let uploadUrlList = res.result;
-        imageList.map(item => {
+        pagedImageList.map(item => {
           const uploadImage = uploadUrlList.shift();
           content = content.replaceAll(
             item.source,
@@ -728,10 +765,11 @@ export default class imageAutoUploadPlugin extends Plugin {
         //   });
         // }
         this.delLocalImage(imageList);
+        new Notice(`第${currentPage}批次(${pageStart}-${pageEnd})的图片已上传完毕`);
       } else {
-        new Notice("Upload error");
+        new Notice(`第${currentPage}批次(${pageStart}-${pageEnd})的图片上传失败`);
       }
-    });
+    }
   }
 
   async saveClipboardDataToFile(clipboardData: DataTransfer) {
@@ -742,8 +780,6 @@ export default class imageAutoUploadPlugin extends Plugin {
 
     const attachmentFolderPath = this.getFileAssetPath();
     const name = file.name;
-
-    console.log("clipboard file: ", file);
 
     const newImgInfo = await this.renameter.generateNewName(name, attachmentFolderPath);
     writeFileSync(newImgInfo.imgPath, buffer);
