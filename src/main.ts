@@ -12,7 +12,7 @@ import {
   requestUrl,
 } from "obsidian";
 
-import { resolve, relative, join, parse, posix, basename, sep } from "path";
+import { resolve, relative, join, parse, posix, basename, dirname, sep } from "path";
 import { existsSync, mkdirSync, writeFileSync, unlink, readdirSync, rmdirSync, rmSync } from "fs";
 
 import fixPath from "fix-path";
@@ -364,7 +364,9 @@ export default class imageAutoUploadPlugin extends Plugin {
     const basePath = (
       this.app.vault.adapter as FileSystemAdapter
     ).getBasePath();
+    const activeFile = this.app.workspace.getActiveFile();
     const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
+    const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
     let imageList: Image[] = [];
     const fileArray = this.filterFile(this.helper.getAllFiles());
 
@@ -380,7 +382,40 @@ export default class imageAutoUploadPlugin extends Plugin {
         });
       } else {
         const fileName = basename(decodeURI(encodedUri));
-        const file = this.getFile(fileName, fileMap);
+        let file;
+        // 绝对路径
+        if (filePathMap[decodeURI(encodedUri)]) {
+          file = filePathMap[decodeURI(encodedUri)];
+        }
+
+        // 相对路径
+        if (
+          (!file && decodeURI(encodedUri).startsWith("./")) ||
+          decodeURI(encodedUri).startsWith("../")
+        ) {
+          const filePath = resolve(
+            join(basePath, dirname(activeFile.path)),
+            decodeURI(encodedUri)
+          );
+
+          if (existsSync(filePath)) {
+            const path = normalizePath(
+              relative(
+                basePath,
+                resolve(
+                  join(basePath, dirname(activeFile.path)),
+                  decodeURI(encodedUri)
+                )
+              )
+            );
+
+            file = filePathMap[path];
+          }
+        }
+        // 尽可能短路径
+        if (!file) {
+          file = this.getFile(fileName, fileMap);
+        }
 
         if (file) {
           const abstractImageFile = join(basePath, file.path);
@@ -767,6 +802,7 @@ export default class imageAutoUploadPlugin extends Plugin {
         this.delLocalImage(imageList);
         new Notice(`第${currentPage}批次(${pageStart}-${pageEnd})的图片已上传完毕`);
       } else {
+        console.error(`第${currentPage}批次(${pageStart}-${pageEnd})的图片上传失败`, res);
         new Notice(`第${currentPage}批次(${pageStart}-${pageEnd})的图片上传失败`);
       }
     }

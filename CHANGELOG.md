@@ -96,3 +96,15 @@ fix [issue42](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issu
 
 1. 修复剪贴板内容为图片链接时黑名单失效的问题 [#73](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/73)
 2. 支持上传后删除源文件
+
+# 3.1.1
+
+1. 新增对 `.webp`, `.avif` 的支持
+
+# 3.2.0
+
+1. 优化上传所有图片指令针对绝对路径解析 [#82](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/82)
+
+# 3.2.1
+
+1. 优化上传所有图片指令的路径解析
